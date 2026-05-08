@@ -1,0 +1,73 @@
+{
+  "name": "JARVIS Production Environment",
+  "version": "2.0.0",
+  "environment": "production",
+  "debug": false,
+  "logging": {
+    "level": "info",
+    "console": false,
+    "file": true
+  },
+  "server": {
+    "port": 3001,
+    "host": "0.0.0.0",
+    "cors": {
+      "origin": ["http://localhost:3001", "http://127.0.0.1:3001"],
+      "methods": ["GET", "POST", "PUT", "DELETE"],
+      "allowedHeaders": ["Content-Type", "Authorization"]
+    }
+  },
+  "ai_services": {
+    "port": 5001,
+    "voice_enabled": true,
+    "speech_recognition": {
+      "engine": "whisper",
+      "fallback_engines": ["google", "sphinx"],
+      "timeout": 3000,
+      "energy_threshold": 400,
+      "dynamic_energy_threshold": true
+    },
+    "text_to_speech": {
+      "engine": "windows",
+      "fallback_engines": ["piper", "edge"],
+      "rate": 1.0,
+      "volume": 0.7,
+      "pitch": 1.0
+    }
+  },
+  "ollama": {
+    "url": "http://localhost:11434",
+    "models": {
+      "primary": "qwen3.5:latest",
+      "fallback": ["llama3.2:3b", "llama3"],
+      "timeout": 5000
+    }
+  },
+  "learning": {
+    "enabled": true,
+    "memory_persistence": true,
+    "self_improvement": true,
+    "adaptation_threshold": 0.8,
+    "max_memory_size": 50000
+  },
+  "frontend": {
+    "port": 5173,
+    "host": "localhost",
+    "hot_reload": false,
+    "devtools": false
+  },
+  "database": {
+    "type": "sqlite",
+    "path": "./server/jarvis_memory.db",
+    "backup_enabled": true,
+    "backup_interval": 7200000
+  },
+  "security": {
+    "encryption_enabled": true,
+    "api_key_required": true,
+    "rate_limiting": {
+      "enabled": true,
+      "requests_per_minute": 60
+    }
+  }
+}
