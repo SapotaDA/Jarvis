@@ -27,6 +27,7 @@ const { addMemory, getMemories } = require('./models/database');
 const voiceEngine = require('../../core/adaptation/behavior/voice_engine');
 const computerControl = require('./services/computer_control');
 const newsService = require('./services/news_service');
+const professionalSpeech = require('./services/professional_speech');
 
 // Helper function to handle computer control commands
 async function handleComputerCommand(text) {
@@ -168,18 +169,44 @@ io.on('connection', (socket) => {
       // Handle computer control commands
       const computerCommand = await handleComputerCommand(data.text);
       if (computerCommand) {
-        socket.emit('response', computerCommand);
-        io.to('ai_services').emit('ai_response', { text: computerCommand.text });
-        voiceEngine.speakAsJarvis(computerCommand.text, { confidence: 0.9 });
+        const professionalComputerResponse = professionalSpeech.processForProfessionalSpeech(computerCommand.text, {
+          category: 'computer_control',
+          data: { command: data.text }
+        });
+        
+        socket.emit('response', { 
+          text: professionalComputerResponse, 
+          source: 'computer_control', 
+          confidence: 0.9,
+          voice_enabled: true
+        });
+        io.to('ai_services').emit('ai_response', { text: professionalComputerResponse });
+        voiceEngine.speakAsJarvis(professionalComputerResponse, { 
+          confidence: 0.9, 
+          category: 'computer_control'
+        });
         return;
       }
 
       // Handle news commands
       const newsResponse = await handleNewsCommand(data.text);
       if (newsResponse) {
-        socket.emit('response', { text: newsResponse, source: 'news', confidence: 0.9 });
-        io.to('ai_services').emit('ai_response', { text: newsResponse });
-        voiceEngine.speakAsJarvis(newsResponse, { confidence: 0.9 });
+        const professionalNewsResponse = professionalSpeech.processForProfessionalSpeech(newsResponse, {
+          category: 'news',
+          data: { query: data.text }
+        });
+        
+        socket.emit('response', { 
+          text: professionalNewsResponse, 
+          source: 'news', 
+          confidence: 0.9,
+          voice_enabled: true
+        });
+        io.to('ai_services').emit('ai_response', { text: professionalNewsResponse });
+        voiceEngine.speakAsJarvis(professionalNewsResponse, { 
+          confidence: 0.9, 
+          category: 'news'
+        });
         return;
       }
 
@@ -203,9 +230,15 @@ io.on('connection', (socket) => {
       addMemory(`User: ${data.text}`, 'conversation');
       addMemory(`JARVIS: ${adaptiveResponse.response}`, 'conversation');
 
+      // Process response for professional speech
+      const professionalResponse = professionalSpeech.processForProfessionalSpeech(adaptiveResponse.response, {
+        category: 'general',
+        data: { confidence: adaptiveResponse.confidence, source: adaptiveResponse.source }
+      });
+
       // Enhanced response with learning metadata
       const responseData = { 
-        text: adaptiveResponse.response,
+        text: professionalResponse,
         source: adaptiveResponse.source,
         confidence: adaptiveResponse.confidence,
         learning_enabled: true,
@@ -215,12 +248,13 @@ io.on('connection', (socket) => {
       socket.emit('response', responseData);
       
       // Send to AI services for TTS
-      io.to('ai_services').emit('ai_response', { text: adaptiveResponse.response });
+      io.to('ai_services').emit('ai_response', { text: professionalResponse });
       
-      // Also speak using voice engine
-      voiceEngine.speakAsJarvis(adaptiveResponse.response, {
+      // Also speak using voice engine with professional processing
+      voiceEngine.speakAsJarvis(professionalResponse, {
         confidence: adaptiveResponse.confidence,
-        source: adaptiveResponse.source
+        source: adaptiveResponse.source,
+        category: 'general'
       });
       
     } catch (error) {

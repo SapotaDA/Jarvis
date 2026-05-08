@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const professionalSpeech = require('../../../src/backend/services/professional_speech');
 
 class VoiceEngine {
     constructor() {
@@ -355,8 +356,11 @@ class VoiceEngine {
 
     // Speak with JARVIS personality
     async speakAsJarvis(text, context = {}) {
-        // Add JARVIS-style modifications
-        let jarvisText = text;
+        // Process text for professional speech using the new service
+        let jarvisText = professionalSpeech.processForProfessionalSpeech(text, {
+            category: context.category || 'general',
+            data: context.data || {}
+        });
         
         // Ensure proper address
         if (!jarvisText.includes('Sir') && context.addressUser !== false) {
