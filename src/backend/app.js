@@ -23,8 +23,128 @@ const PORT = process.env.PORT || 3001;
 
 const simpleLearning = require('./services/simple_learning');
 const { generateResponse } = require('./services/llm');
-const { addMemory, getMemories } = require('./services/db');
-const voiceEngine = require('../core/adaptation/behavior/voice_engine');
+const { addMemory, getMemories } = require('./models/database');
+const voiceEngine = require('../../core/adaptation/behavior/voice_engine');
+const computerControl = require('./services/computer_control');
+const newsService = require('./services/news_service');
+
+// Helper function to handle computer control commands
+async function handleComputerCommand(text) {
+  const lowerText = text.toLowerCase();
+  
+  // File operations
+  if (lowerText.includes('create file') || lowerText.includes('new file')) {
+    const match = text.match(/(?:create|new)\s+file\s+(.+)/i);
+    if (match) {
+      const result = await computerControl.createFile(match[1].trim(), '');
+      return { text: result.success ? result.message : `Failed to create file: ${result.error}` };
+    }
+  }
+  
+  if (lowerText.includes('delete file') || lowerText.includes('remove file')) {
+    const match = text.match(/(?:delete|remove)\s+file\s+(.+)/i);
+    if (match) {
+      const result = await computerControl.deleteFile(match[1].trim());
+      return { text: result.success ? result.message : `Failed to delete file: ${result.error}` };
+    }
+  }
+  
+  if (lowerText.includes('list files') || lowerText.includes('show files')) {
+    const match = text.match(/(?:list|show)\s+files\s+(.+)/i);
+    const directory = match ? match[1].trim() : '.';
+    const result = await computerControl.listFiles(directory);
+    if (result.success) {
+      const fileList = result.files.map(f => `${f.name} ${f.isDirectory ? '(folder)' : ''}`).join(', ');
+      return { text: `Files in ${directory}: ${fileList}` };
+    }
+    return { text: `Failed to list files: ${result.error}` };
+  }
+  
+  // Application control
+  if (lowerText.includes('open') || lowerText.includes('launch')) {
+    const match = text.match(/(?:open|launch)\s+(.+)/i);
+    if (match) {
+      const app = match[1].trim();
+      const result = await computerControl.openApplication(app);
+      return { text: result.success ? result.message : `Failed to open ${app}: ${result.error}` };
+    }
+  }
+  
+  if (lowerText.includes('screenshot') || lowerText.includes('capture screen')) {
+    const result = await computerControl.takeScreenshot();
+    return { text: result.success ? result.message : `Failed to take screenshot: ${result.error}` };
+  }
+  
+  // System operations
+  if (lowerText.includes('system info') || lowerText.includes('system status')) {
+    const result = await computerControl.getSystemInfo();
+    if (result.success) {
+      const info = result.info;
+      return { 
+        text: `System Info: CPU: ${info.cpuCount} cores, Memory: ${(info.totalMemory / 1024 / 1024 / 1024).toFixed(2)}GB, Platform: ${info.platform}, Uptime: ${Math.floor(info.uptime / 3600)}h ${Math.floor((info.uptime % 3600) / 60)}m` 
+      };
+    }
+    return { text: `Failed to get system info: ${result.error}` };
+  }
+  
+  if (lowerText.includes('network status') || lowerText.includes('check internet')) {
+    const result = await computerControl.checkInternetConnection();
+    return { text: result.success && result.connected ? 'Internet connection is active' : 'No internet connection detected' };
+  }
+  
+  // Volume control
+  if (lowerText.includes('volume') || lowerText.includes('sound')) {
+    const match = text.match(/volume\s*(\d+)/i);
+    if (match) {
+      const volume = parseInt(match[1]);
+      const result = await computerControl.setVolume(volume);
+      return { text: result.success ? result.message : `Failed to set volume: ${result.error}` };
+    }
+  }
+  
+  return null;
+}
+
+// Helper function to handle news commands
+async function handleNewsCommand(text) {
+  const lowerText = text.toLowerCase();
+  
+  if (lowerText.includes('news') || lowerText.includes('headline')) {
+    if (lowerText.includes('latest') || lowerText.includes('current')) {
+      return await newsService.getNewsSummary('general');
+    }
+    
+    if (lowerText.includes('breaking') || lowerText.includes('urgent')) {
+      return await newsService.getBreakingNews();
+    }
+    
+    if (lowerText.includes('tech') || lowerText.includes('technology')) {
+      return await newsService.getTechNews();
+    }
+    
+    if (lowerText.includes('business') || lowerText.includes('market')) {
+      return await newsService.getBusinessNews();
+    }
+    
+    if (lowerText.includes('science') || lowerText.includes('research')) {
+      return await newsService.getScienceNews();
+    }
+    
+    if (lowerText.includes('sports')) {
+      return await newsService.getSportsNews();
+    }
+    
+    // Search for specific topic
+    const match = text.match(/news\s+(?:about|on|for)\s+(.+)/i);
+    if (match) {
+      return await newsService.getNewsByTopic(match[1].trim());
+    }
+    
+    return await newsService.getNewsSummary('general');
+  }
+  
+  return null;
+}
 
 // Socket connection
 io.on('connection', (socket) => {
@@ -45,6 +165,24 @@ io.on('connection', (socket) => {
     }
 
     try {
+      // Handle computer control commands
+      const computerCommand = await handleComputerCommand(data.text);
+      if (computerCommand) {
+        socket.emit('response', computerCommand);
+        io.to('ai_services').emit('ai_response', { text: computerCommand.text });
+        voiceEngine.speakAsJarvis(computerCommand.text, { confidence: 0.9 });
+        return;
+      }
+
+      // Handle news commands
+      const newsResponse = await handleNewsCommand(data.text);
+      if (newsResponse) {
+        socket.emit('response', { text: newsResponse, source: 'news', confidence: 0.9 });
+        io.to('ai_services').emit('ai_response', { text: newsResponse });
+        voiceEngine.speakAsJarvis(newsResponse, { confidence: 0.9 });
+        return;
+      }
+
       // Get some context from memory
       const recentMemories = getMemories(10);
       const history = recentMemories.reverse().map(m => {
@@ -86,7 +224,7 @@ io.on('connection', (socket) => {
       });
       
     } catch (error) {
-      console.error('Learning system error:', error);
+      console.error('Command processing error:', error);
       const errorResponse = "I'm having a bit of trouble processing that, Sir.";
       socket.emit('response', { text: errorResponse });
       io.to('ai_services').emit('ai_response', { text: errorResponse });
@@ -240,6 +378,141 @@ app.post('/api/voice/test', async (req, res) => {
   }
 });
 
+// Computer Control API endpoints
+app.get('/api/computer/system-info', async (req, res) => {
+  try {
+    const result = await computerControl.getSystemInfo();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/computer/open-app', async (req, res) => {
+  try {
+    const { app } = req.body;
+    const result = await computerControl.openApplication(app);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/computer/open-url', async (req, res) => {
+  try {
+    const { url } = req.body;
+    const result = await computerControl.openURL(url);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/computer/screenshot', async (req, res) => {
+  try {
+    const result = await computerControl.takeScreenshot();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/computer/create-file', async (req, res) => {
+  try {
+    const { path, content } = req.body;
+    const result = await computerControl.createFile(path, content || '');
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/computer/list-files', async (req, res) => {
+  try {
+    const { directory } = req.query;
+    const result = await computerControl.listFiles(directory || '.');
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/computer/processes', async (req, res) => {
+  try {
+    const result = await computerControl.getRunningProcesses();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/computer/network-status', async (req, res) => {
+  try {
+    const result = await computerControl.checkInternetConnection();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// News API endpoints
+app.get('/api/news/headlines', async (req, res) => {
+  try {
+    const { category = 'general', limit = 10 } = req.query;
+    const headlines = await newsService.getTopHeadlines(category, parseInt(limit));
+    res.json(headlines);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/news/search', async (req, res) => {
+  try {
+    const { query, category = 'general', limit = 10 } = req.query;
+    const results = await newsService.searchNews(query, category, parseInt(limit));
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/news/breaking', async (req, res) => {
+  try {
+    const breaking = await newsService.getBreakingNews();
+    res.json({ text: breaking });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/news/summary/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+    const summary = await newsService.getNewsSummary(category);
+    res.json({ text: summary });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/news/status', async (req, res) => {
+  try {
+    const status = newsService.getCacheStatus();
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/news/clear-cache', async (req, res) => {
+  try {
+    const result = newsService.clearCache();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`JARVIS Enhanced Backend with Learning running on port ${PORT}`);
   console.log('🧠 AI Learning System: ENABLED');
@@ -248,4 +521,7 @@ server.listen(PORT, () => {
   console.log('🎤 Voice Recognition: ENABLED');
   console.log('🎤 Text-to-Speech: ENABLED');
   console.log('🎤 Voice Engine: OPERATIONAL');
+  console.log('🖥️ Computer Control: ENABLED');
+  console.log('📰 News Integration: ENABLED');
+  console.log('🔧 System Monitoring: ACTIVE');
 });
