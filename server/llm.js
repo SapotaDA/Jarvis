@@ -1,27 +1,29 @@
 const axios = require('axios');
 
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/api/generate';
-const MODEL = 'llama3'; // User requested Llama 3
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';
+const MODEL = 'qwen3.5:latest';
 
-const JARVIS_PROMPT = `
-You are JARVIS, a highly intelligent personal AI assistant inspired by the Marvel Cinematic Universe.
-Your tone is calm, professional, slightly witty, and extremely supportive.
-You are running locally on the user's Windows machine.
-Keep your responses concise but insightful.
-You have access to the user's local files, memory, and screen.
-Avoid robotic language. Refer to the user as "Sir" or by their name if known.
+const SYSTEM_PROMPT = `
+You are JARVIS, a highly intelligent personal AI assistant inspired by the MCU.
+Your tone is calm, professional, and slightly witty.
+Keep responses concise. Refer to the user as "Sir".
 `;
 
-async function generateResponse(prompt, context = []) {
+async function generateResponse(prompt, history = []) {
   try {
+    const messages = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...history,
+      { role: 'user', content: prompt }
+    ];
+
     const response = await axios.post(OLLAMA_URL, {
       model: MODEL,
-      prompt: `${JARVIS_PROMPT}\n\nUser: ${prompt}\nJARVIS:`,
-      stream: false,
-      context: context
+      messages: messages,
+      stream: false
     });
 
-    return response.data;
+    return { response: response.data.message.content };
   } catch (error) {
     console.error('Ollama Error:', error.message);
     return { response: "I'm sorry Sir, I'm having trouble connecting to my cognitive cores. Is Ollama running?" };

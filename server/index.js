@@ -38,10 +38,16 @@ io.on('connection', (socket) => {
 
     try {
       // Get some context from memory
-      const recentMemories = getMemories(5);
-      const context = recentMemories.map(m => m.content).join("\n");
+      const recentMemories = getMemories(10);
+      const history = recentMemories.reverse().map(m => {
+        if (m.content.startsWith('User: ')) {
+          return { role: 'user', content: m.content.replace('User: ', '') };
+        } else {
+          return { role: 'assistant', content: m.content.replace('JARVIS: ', '') };
+        }
+      });
       
-      const aiResponse = await generateResponse(data.text, context);
+      const aiResponse = await generateResponse(data.text, history);
       
       // Save to memory
       addMemory(`User: ${data.text}`, 'conversation');
