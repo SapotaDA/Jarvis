@@ -21,8 +21,8 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3001;
 
-const { generateResponse } = require('./llm');
-const { addMemory, getMemories } = require('./db');
+const { generateResponse } = require('./services/llm');
+const { addMemory, getMemories } = require('./services/db');
 
 // Socket connection
 io.on('connection', (socket) => {

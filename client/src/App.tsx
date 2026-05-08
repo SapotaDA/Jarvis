@@ -5,7 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Minus, Terminal as TerminalIcon, Mic } from 'lucide-react';
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:3001');
+const socket = io('http://localhost:3001', {
+  transports: ['websocket', 'polling'],
+  autoConnect: true,
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000
+});
 
 const App: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -13,21 +19,38 @@ const App: React.FC = () => {
   const [userText, setUserText] = useState('');
   const [aiText, setAiText] = useState('');
   const [inputText, setInputText] = useState('');
-  const [isListening, setIsListening] = useState(false);
+  const [isListening] = useState(false);
   
-  const aiTextTimeout = useRef<NodeJS.Timeout | null>(null);
+  const aiTextTimeout = useRef<number | null>(null);
 
   useEffect(() => {
-    socket.on('connect', () => console.log('Connected to JARVIS Core'));
+    socket.on('connect', () => {
+      console.log('Connected to JARVIS Core');
+      setAiText('System connected successfully');
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('Disconnected from JARVIS Core');
+      setAiText('Connection lost');
+    });
+    
+    socket.on('connect_error', (error) => {
+      console.log('Connection error:', error);
+      setAiText('Failed to connect to backend');
+    });
     
     socket.on('response', (data: { text: string }) => {
+      console.log('AI Response:', data.text);
       setAiText(data.text);
-      // Clear AI text after 5 seconds of inactivity
+      // Clear AI text after 8 seconds of inactivity
       if (aiTextTimeout.current) clearTimeout(aiTextTimeout.current);
       aiTextTimeout.current = setTimeout(() => setAiText(''), 8000);
     });
 
     return () => {
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('connect_error');
       socket.off('response');
     };
   }, []);

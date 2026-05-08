@@ -1,7 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'jarvis_memory.db'));
+const db = new Database(path.join(__dirname, '../jarvis_memory.db'));
 
 // Initialize tables
 db.exec(`

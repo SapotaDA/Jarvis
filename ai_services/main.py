@@ -6,6 +6,7 @@ import socketio
 import eventlet
 from flask import Flask
 from flask_socketio import SocketIO
+from socketio import Client as SocketIOClient
 import speech_recognition as sr
 from dotenv import load_dotenv
 
@@ -15,16 +16,25 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Node.js Backend Client
-sio_client = socketio.Client()
+sio_client = SocketIOClient(logger=True, engineio_logger=True)
 
 def connect_to_backend():
-    try:
-        sio_client.connect('http://127.0.0.1:3001')
-        print("Connected to Node.js Backend")
-    except:
-        print("Waiting for Node.js Backend...")
-        time.sleep(5)
-        connect_to_backend()
+    max_retries = 5
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        try:
+            if not sio_client.connected:
+                sio_client.connect('http://127.0.0.1:3001')
+                print("Connected to Node.js Backend")
+                return True
+        except Exception as e:
+            print(f"Connection attempt {retry_count + 1} failed: {e}")
+            retry_count += 1
+            time.sleep(2)
+    
+    print("Could not connect to backend after multiple attempts")
+    return False
 
 def listen_loop():
     recognizer = sr.Recognizer()
@@ -33,26 +43,45 @@ def listen_loop():
     print("JARVIS Listening Service Active...")
     
     with mic as source:
-        recognizer.adjust_for_ambient_noise(source)
+        recognizer.adjust_for_ambient_noise(source, duration=1)
         
         while True:
             try:
-                print("Listening...")
-                audio = recognizer.listen(source, phrase_time_limit=5)
+                print("Listening for command...")
+                audio = recognizer.listen(source, phrase_time_limit=3, timeout=1)
                 print("Processing speech...")
                 
-                # Using Google for now as a fallback if Whisper is not setup, 
-                # but it can be swapped for Whisper locally.
-                text = recognizer.recognize_google(audio)
+                # Try to recognize speech
+                try:
+                    # First try Whisper (if available)
+                    text = recognizer.recognize_whisper(audio, model="tiny.en")
+                except:
+                    try:
+                        # Fallback to Google Speech Recognition
+                        text = recognizer.recognize_google(audio)
+                    except:
+                        # If all fails, try Sphinx (offline)
+                        text = recognizer.recognize_sphinx(audio)
+                
                 print(f"You said: {text}")
                 
-                if sio_client.connected:
-                    sio_client.emit('command', {'text': text})
+                # Only send if we have meaningful text
+                if len(text.strip()) > 0 and not text.strip().lower() in ['hey', 'hello', 'hi']:
+                    if sio_client.connected:
+                        print("Sending to backend...")
+                        sio_client.emit('command', {'text': text})
+                    else:
+                        print("Not connected to backend")
+                    
+                    socketio.emit('voice_text', {'text': text})
                 
-                socketio.emit('voice_text', {'text': text})
-                
+            except sr.WaitTimeoutError:
+                continue
             except sr.UnknownValueError:
-                pass
+                print("Could not understand audio")
+            except sr.RequestError as e:
+                print(f"Speech recognition error: {e}")
+                time.sleep(2)
             except Exception as e:
                 print(f"Error: {e}")
                 time.sleep(1)

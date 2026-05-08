@@ -1,7 +1,9 @@
 {
-  "name": "client",
+  "name": "jarvis-interface",
   "private": true,
-  "version": "0.0.0",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Cinematic desktop interface for JARVIS AI",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
