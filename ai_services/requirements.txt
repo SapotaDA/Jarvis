@@ -1,0 +1,13 @@
+pvporcupine
+pvrecorder
+openai-whisper
+piper-tts
+opencv-python
+pyautogui
+pyttsx3
+flask
+flask-socketio
+python-dotenv
+mss
+numpy
+Pillow
