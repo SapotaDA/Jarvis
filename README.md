@@ -1,54 +1,51 @@
 # JARVIS — Personal Offline AI Assistant
 
-JARVIS is a local-first, privacy-focused AI assistant built with Electron, Node.js, Python, and Ollama.
+JARVIS is a highly advanced, local-first AI assistant inspired by the MCU. It runs entirely on your local machine, ensuring total privacy and near-instant responsiveness.
 
-## Project Structure
+## 🚀 One-Click Startup (Windows)
+Simply run the `start_jarvis.bat` file in the root directory. This will launch all three JARVIS subsystems:
+1. **JARVIS Core**: The Node.js backend & memory database.
+2. **JARVIS Interface**: The cinematic Electron desktop application.
+3. **AI Services**: The Python voice recognition and automation engine.
 
-- `client/`: Electron + React (Vite) - The UI and desktop shell.
-- `server/`: Node.js Backend - Memory management, LLM coordination, and APIs.
-- `ai_services/`: Python Services - Voice (Wake Word, STT, TTS) and Vision (OCR, Screen Analysis).
+## 📁 Project Architecture
 
-## Setup Instructions
-
-### 1. Prerequisites
-- Node.js (v18+)
-- Python 3.10+
-- [Ollama](https://ollama.com/) (Must be installed and running)
-  - Run `ollama pull llama3` to download the model.
-
-### 2. Client Setup
-```bash
-cd client
-npm install
-npm run dev
+```text
+JARVIS/
+├── client/          # Electron + React + Tailwind (The "Face")
+├── server/          # Node.js + Express + SQLite + Ollama (The "Nervous System")
+├── ai_services/     # Python + Whisper + OpenCV (The "Brain")
+├── start_jarvis.bat # One-click launcher
+└── package.json     # Project-wide task runner
 ```
 
-### 3. Server Setup
-```bash
-cd server
-npm install
-node index.js
-```
+## 🛠️ Initial Configuration
 
-### 4. AI Services Setup
-```bash
+### 1. The Brain (Ollama)
+JARVIS requires [Ollama](https://ollama.com/) to be installed.
+- Ensure Ollama is running.
+- Pull the default model: `ollama pull qwen3.5:latest` (or `llama3`).
+
+### 2. Python Environment (Voice)
+To enable voice recognition ("when you say something"):
+```powershell
 cd ai_services
 python -m venv venv
-venv\Scripts\activate
+.\venv\Scripts\activate
 pip install -r requirements.txt
-python main.py
 ```
 
-## Features Implemented
-- [x] Futuristic Electron Shell (Transparent, Frameless)
-- [x] JARVIS AI Orb (Animated)
-- [x] Dashboard UI (Glassmorphism)
-- [x] SQLite Memory Database
-- [x] Ollama (Llama 3) Integration
-- [x] AI Services Foundation (Python)
+### 3. Desktop Client
+```powershell
+cd client
+npm install
+```
 
-## Next Steps
-- Implement Porcupine wake word detection.
-- Integrate Whisper for real-time STT.
-- Implement screen capture and OCR analysis.
-- Connect the frontend input to the Ollama backend.
+## 🎙️ Using JARVIS
+- **Activation**: Click the **"Start JARVIS AI"** button.
+- **Voice**: Speak naturally. JARVIS is always listening when the AI Services are active.
+- **Captions**: Your speech and JARVIS's thoughts will appear as cinematic subtitles.
+- **Dashboard**: Click the **Pulsing Orb** to view memory logs and system stats.
+
+## 🔒 Privacy & Security
+Everything stays on your machine. No data is sent to the cloud. All memories are stored in a local SQLite database (`server/jarvis_memory.db`).
