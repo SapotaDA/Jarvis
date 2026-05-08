@@ -1,12 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Orb from './components/Orb';
 import Dashboard from './components/Dashboard';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minus, Maximize2 } from 'lucide-react';
+import { X, Minus, Terminal as TerminalIcon, Mic } from 'lucide-react';
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3001');
 
 const App: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [userText, setUserText] = useState('');
+  const [aiText, setAiText] = useState('');
+  const [inputText, setInputText] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  
+  const aiTextTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    socket.on('connect', () => console.log('Connected to JARVIS Core'));
+    
+    socket.on('response', (data: { text: string }) => {
+      setAiText(data.text);
+      // Clear AI text after 5 seconds of inactivity
+      if (aiTextTimeout.current) clearTimeout(aiTextTimeout.current);
+      aiTextTimeout.current = setTimeout(() => setAiText(''), 8000);
+    });
+
+    return () => {
+      socket.off('response');
+    };
+  }, []);
 
   const handleMinimize = () => {
     (window as any).electronAPI?.minimize();
@@ -19,10 +43,23 @@ const App: React.FC = () => {
   const toggleSystem = () => {
     setIsActive(!isActive);
     if (!isActive) {
-      // Simulate system initialization
+      setAiText("Online and ready, Sir.");
+      socket.emit('command', { text: 'system-init' });
       const audio = new Audio('https://www.soundjay.com/buttons/sounds/button-37a.mp3');
       audio.play().catch(() => {});
+    } else {
+      setAiText("");
+      setUserText("");
     }
+  };
+
+  const handleCommand = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+    
+    setUserText(inputText);
+    socket.emit('command', { text: inputText });
+    setInputText('');
   };
 
   return (
@@ -92,8 +129,63 @@ const App: React.FC = () => {
           )}
         </AnimatePresence>
 
-        {/* Status Label */}
-        {isActive && !isExpanded && (
+        {/* Captions & Command Bar - Bottom Persistent */}
+        <AnimatePresence>
+          {isActive && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className="fixed bottom-10 flex flex-col items-center gap-6 w-full max-w-3xl px-6 pointer-events-none"
+            >
+              {/* Cinematic Captions */}
+              <div className="flex flex-col items-center gap-2 text-center w-full">
+                {userText && (
+                  <motion.p 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-gray-400 text-sm italic font-medium"
+                  >
+                    "{userText}"
+                  </motion.p>
+                )}
+                {aiText && (
+                  <motion.p 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-jarvis-primary text-2xl font-bold tracking-tight glow-text max-w-xl"
+                  >
+                    {aiText}
+                  </motion.p>
+                )}
+              </div>
+
+              {/* Quick Input Bar */}
+              <form 
+                onSubmit={handleCommand}
+                className="w-full flex items-center gap-4 bg-jarvis-bg/80 backdrop-blur-xl border border-jarvis-primary/20 rounded-full px-6 py-3 pointer-events-auto shadow-2xl"
+              >
+                <TerminalIcon className="text-jarvis-primary w-5 h-5 opacity-50" />
+                <input 
+                  type="text" 
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="What is your command, Sir?"
+                  className="bg-transparent border-none outline-none flex-1 text-white placeholder:text-gray-600 text-sm"
+                />
+                <button 
+                  type="button"
+                  className={`p-2 rounded-full transition-colors ${isListening ? 'bg-red-500/20 text-red-500' : 'hover:bg-white/5 text-gray-500 hover:text-jarvis-primary'}`}
+                >
+                  <Mic className="w-5 h-5" />
+                </button>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Status Label (Only when not expanded) */}
+        {isActive && !isExpanded && !aiText && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
