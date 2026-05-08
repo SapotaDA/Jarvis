@@ -1,18 +1,24 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-const Orb: React.FC = () => {
+interface OrbProps {
+  isActive: boolean;
+}
+
+const Orb: React.FC<OrbProps> = ({ isActive }) => {
   return (
     <div className="relative w-64 h-64 flex items-center justify-center">
       {/* Outer Ring */}
       <motion.div
-        className="absolute w-full h-full border-2 border-jarvis-primary rounded-full opacity-20"
+        className={`absolute w-full h-full border-2 rounded-full transition-colors duration-500 ${
+          isActive ? 'border-jarvis-primary opacity-40' : 'border-gray-500 opacity-20'
+        }`}
         animate={{
-          scale: [1, 1.1, 1],
+          scale: isActive ? [1, 1.15, 1] : [1, 1.05, 1],
           rotate: 360,
         }}
         transition={{
-          duration: 8,
+          duration: isActive ? 4 : 12,
           repeat: Infinity,
           ease: "linear"
         }}
@@ -20,12 +26,14 @@ const Orb: React.FC = () => {
       
       {/* Inner Pulsing Rings */}
       <motion.div
-        className="absolute w-48 h-48 border border-jarvis-primary rounded-full opacity-40"
+        className={`absolute w-48 h-48 border rounded-full transition-colors duration-500 ${
+          isActive ? 'border-jarvis-primary opacity-60' : 'border-gray-600 opacity-30'
+        }`}
         animate={{
-          scale: [0.9, 1.05, 0.9],
+          scale: isActive ? [0.85, 1.1, 0.85] : [0.95, 1.02, 0.95],
         }}
         transition={{
-          duration: 3,
+          duration: isActive ? 1.5 : 5,
           repeat: Infinity,
           ease: "easeInOut"
         }}
@@ -33,32 +41,36 @@ const Orb: React.FC = () => {
       
       {/* Core Orb */}
       <motion.div
-        className="relative w-32 h-32 bg-jarvis-primary rounded-full blur-sm"
+        className={`relative w-32 h-32 rounded-full blur-sm transition-all duration-500 ${
+          isActive ? 'bg-jarvis-primary' : 'bg-gray-700'
+        }`}
         animate={{
-          scale: [1, 1.2, 1],
-          opacity: [0.6, 1, 0.6],
+          scale: isActive ? [1, 1.3, 1] : [1, 1.1, 1],
+          opacity: isActive ? [0.8, 1, 0.8] : [0.4, 0.6, 0.4],
         }}
         transition={{
-          duration: 2,
+          duration: isActive ? 1 : 4,
           repeat: Infinity,
           ease: "easeInOut"
         }}
         style={{
-          boxShadow: '0 0 50px #00e5ff, 0 0 100px #00e5ff inset'
+          boxShadow: isActive 
+            ? '0 0 60px #00e5ff, 0 0 120px #00e5ff inset' 
+            : '0 0 20px rgba(100, 100, 100, 0.5)'
         }}
       />
 
-      {/* Voice Waveforms (Static placeholder for now) */}
+      {/* Voice Waveforms */}
       <div className="absolute flex items-center justify-center gap-1">
-        {[...Array(5)].map((_, i) => (
+        {isActive && [...Array(5)].map((_, i) => (
           <motion.div
             key={i}
             className="w-1 bg-white rounded-full"
             animate={{
-              height: [10, 40, 10],
+              height: [10, 50, 10],
             }}
             transition={{
-              duration: 1,
+              duration: 0.8,
               repeat: Infinity,
               delay: i * 0.1,
               ease: "easeInOut"

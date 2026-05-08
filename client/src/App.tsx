@@ -6,6 +6,7 @@ import { X, Minus, Maximize2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isActive, setIsActive] = useState(false);
 
   const handleMinimize = () => {
     (window as any).electronAPI?.minimize();
@@ -13,6 +14,15 @@ const App: React.FC = () => {
 
   const handleClose = () => {
     (window as any).electronAPI?.close();
+  };
+
+  const toggleSystem = () => {
+    setIsActive(!isActive);
+    if (!isActive) {
+      // Simulate system initialization
+      const audio = new Audio('https://www.soundjay.com/buttons/sounds/button-37a.mp3');
+      audio.play().catch(() => {});
+    }
   };
 
   return (
@@ -38,17 +48,31 @@ const App: React.FC = () => {
         {/* Animated AI Orb */}
         <motion.div
           layout
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="cursor-pointer"
+          onClick={() => isActive && setIsExpanded(!isExpanded)}
+          className={`cursor-pointer transition-all duration-700 ${!isActive ? 'opacity-50 grayscale' : ''}`}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <Orb />
+          <Orb isActive={isActive} />
         </motion.div>
+
+        {/* Start Button */}
+        {!isActive && (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ scale: 1.1, boxShadow: '0 0 20px rgba(0, 229, 255, 0.4)' }}
+            whileTap={{ scale: 0.9 }}
+            onClick={toggleSystem}
+            className="px-8 py-3 bg-jarvis-primary/10 border border-jarvis-primary text-jarvis-primary rounded-full font-bold uppercase tracking-widest text-xs glow-border"
+          >
+            Start JARVIS AI
+          </motion.button>
+        )}
 
         {/* HUD / Dashboard Overlay */}
         <AnimatePresence>
-          {isExpanded && (
+          {isExpanded && isActive && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -56,12 +80,20 @@ const App: React.FC = () => {
               className="w-[90vw] max-w-5xl h-[70vh] glass rounded-3xl overflow-hidden border border-jarvis-primary/30"
             >
               <Dashboard />
+              
+              {/* Deactivate Button in Dashboard */}
+              <button 
+                onClick={toggleSystem}
+                className="absolute bottom-6 right-6 px-4 py-2 bg-red-500/10 border border-red-500/50 text-red-500 text-[10px] uppercase font-bold tracking-tighter rounded-lg hover:bg-red-500/20 transition-colors"
+              >
+                Deactivate System
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Status Label */}
-        {!isExpanded && (
+        {isActive && !isExpanded && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
