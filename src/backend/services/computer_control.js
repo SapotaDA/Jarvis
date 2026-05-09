@@ -164,7 +164,7 @@ class ComputerControlService {
         }
         
         // Try to open as file or URL
-        if (query.startsWith('http://') || query.startsWith('https://') || query.startsWith('www.')) {
+        if (query.startsWith('http://') || query.startsWith('https://') || query.startsWith('www.') || query.endsWith('.com') || query.endsWith('.org') || query.endsWith('.net') || query.endsWith('.io')) {
             return await this.openURL(query);
         }
         
@@ -486,33 +486,6 @@ class ComputerControlService {
     }
 
     // Screenshot
-    async takeScreenshot() {
-        return new Promise((resolve) => {
-            let command;
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `screenshot-${timestamp}.png`;
-            
-            if (this.isWindows) {
-                // Requires PowerShell or third-party tool
-                command = `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{PRTSC}'; Start-Sleep -Milliseconds 500; Add-Type -AssemblyName System.Drawing; $bmp = [System.Windows.Forms.Clipboard]::GetImage(); if ($bmp) { $bmp.Save('${filename}', [System.Drawing.Imaging.ImageFormat]::Png); }"`;
-            } else if (this.isMac) {
-                command = `screencapture ${filename}`;
-            } else {
-                // Linux - requires scrot or similar
-                command = `scrot ${filename}`;
-            }
-
-            exec(command, (error) => {
-                if (error) {
-                    resolve({ success: false, error: error.message });
-                } else {
-                    resolve({ success: true, filename, message: `Screenshot saved: ${filename}` });
-                }
-            });
-        });
-    }
-
-    // Volume Control
     async setVolume(level) {
         return new Promise((resolve) => {
             let command;
