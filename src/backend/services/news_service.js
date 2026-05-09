@@ -1,6 +1,7 @@
-const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
+const https = require('https');
+const http = require('http');
 
 class NewsService {
     constructor() {
@@ -162,21 +163,40 @@ class NewsService {
             throw new Error('No API key provided for news source');
         }
 
-        const params = {
+        const params = new URLSearchParams({
             apiKey: source.apiKey,
-            pageSize: limit
-        };
-
-        if (source.country) params.country = source.country;
-        if (source.category) params.category = source.category;
-        if (source.sources) params.sources = source.sources;
-
-        const response = await axios.get(source.url, { 
-            params,
-            timeout: 10000 
+            pageSize: limit.toString()
         });
 
-        return response.data;
+        if (source.country) params.append('country', source.country);
+        if (source.category) params.append('category', source.category);
+        if (source.sources) params.append('sources', source.sources);
+
+        const url = `${source.url}?${params.toString()}`;
+        
+        return new Promise((resolve, reject) => {
+            const protocol = source.url.startsWith('https') ? https : http;
+            const request = protocol.get(url, { timeout: 10000 }, (response) => {
+                let data = '';
+                response.on('data', (chunk) => {
+                    data += chunk;
+                });
+                response.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(data);
+                        resolve(parsed);
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            });
+
+            request.on('error', reject);
+            request.on('timeout', () => {
+                request.destroy();
+                reject(new Error('Request timeout'));
+            });
+        });
     }
 
     async fetchCustomSource(source, limit = 10) {
@@ -190,14 +210,13 @@ class NewsService {
     async fetchHackerNews(limit = 10) {
         try {
             // Get top story IDs
-            const storiesResponse = await axios.get('https://hacker-news.firebaseio.com/v0/topstories.json');
-            const storyIds = storiesResponse.data.slice(0, limit);
+            const storiesResponse = await this.fetchJson('https://hacker-news.firebaseio.com/v0/topstories.json');
+            const storyIds = storiesResponse.slice(0, limit);
 
             const articles = [];
             for (const storyId of storyIds) {
                 try {
-                    const storyResponse = await axios.get(`https://hacker-news.firebaseio.com/v0/item/${storyId}.json`);
-                    const story = storyResponse.data;
+                    const story = await this.fetchJson(`https://hacker-news.firebaseio.com/v0/item/${storyId}.json`);
                     
                     if (story && story.title && story.url) {
                         articles.push({
@@ -219,6 +238,27 @@ class NewsService {
             console.error('Failed to fetch Hacker News:', error);
             throw error;
         }
+    }
+
+    async fetchJson(url) {
+        return new Promise((resolve, reject) => {
+            https.get(url, { timeout: 10000 }, (response) => {
+                let data = '';
+                response.on('data', (chunk) => {
+                    data += chunk;
+                });
+                response.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(data);
+                        resolve(parsed);
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }).on('error', reject).on('timeout', () => {
+                    reject(new Error('Request timeout'));
+                });
+        });
     }
 
     removeDuplicates(articles) {

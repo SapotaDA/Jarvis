@@ -1,4 +1,5 @@
-const axios = require('axios');
+const https = require('https');
+const http = require('http');
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';
 const MODEL = 'qwen3.5:latest';
@@ -22,23 +23,57 @@ async function generateResponse(prompt, history = []) {
         { role: 'user', content: prompt }
       ];
 
-      const response = await axios.post(OLLAMA_URL, {
-        model: model,
-        messages: messages,
-        stream: false,
-        options: {
-          temperature: 0.7,
-          top_p: 0.9,
-          max_tokens: 150
-        }
-      }, { timeout: 8000 });
+      const response = await new Promise((resolve, reject) => {
+        const data = JSON.stringify({
+          model: model,
+          messages: messages,
+          stream: false,
+          options: {
+            temperature: 0.7,
+            top_p: 0.9,
+            max_tokens: 500
+          }
+        });
 
-      if (response.data && response.data.message) {
+        const protocol = OLLAMA_URL.startsWith('https') ? https : http;
+        const req = protocol.request(OLLAMA_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': data.length
+          },
+          timeout: 30000
+        }, (res) => {
+          let responseData = '';
+          res.on('data', (chunk) => {
+            responseData += chunk;
+          });
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(responseData);
+              resolve(parsed);
+            } catch (error) {
+              reject(error);
+            }
+          });
+        });
+
+        req.on('error', reject);
+        req.on('timeout', () => {
+          req.destroy();
+          reject(new Error('Request timeout'));
+        });
+
+        req.write(data);
+        req.end();
+      });
+
+      if (response && response.message) {
         console.log(`✅ Successfully used model: ${model}`);
-        return { response: response.data.message.content };
+        return { response: response.message.content, source: 'ollama', confidence: 0.9 };
       }
     } catch (error) {
-      console.warn(`Model ${model} failed:`, error.response?.data?.error || error.message);
+      console.warn(`Model ${model} failed:`, error.message);
       continue; // Try next model
     }
   }

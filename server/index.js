@@ -28,6 +28,7 @@ const voiceEngine = require('../core/adaptation/behavior/voice_engine');
 const computerControl = require('../src/backend/services/computer_control');
 const newsService = require('../src/backend/services/news_service');
 const professionalSpeech = require('../src/backend/services/professional_speech');
+const emailService = require('../src/backend/services/email_service');
 
 // Helper function to handle computer control commands
 async function handleComputerCommand(text) {
@@ -66,7 +67,7 @@ async function handleComputerCommand(text) {
     const match = text.match(/(?:open|launch)\s+(.+)/i);
     if (match) {
       const app = match[1].trim();
-      const result = await computerControl.openApplication(app);
+      const result = await computerControl.openAnyApplication(app);
       return { text: result.success ? result.message : `Failed to open ${app}: ${result.error}` };
     }
   }
@@ -147,6 +148,48 @@ async function handleNewsCommand(text) {
   return null;
 }
 
+// Helper function to handle email commands
+async function handleEmailCommand(text) {
+  const lowerText = text.toLowerCase();
+  
+  if (lowerText.includes('send email') || lowerText.includes('email') || lowerText.includes('mail')) {
+    // Extract email details from command
+    const toMatch = text.match(/(?:to|send)\s+([^\s]+@[^\s]+)/i);
+    const subjectMatch = text.match(/(?:subject|about)\s+["']([^"']+)["']/i);
+    const bodyMatch = text.match(/(?:body|message|text)\s+["']([^"']+)["']/i);
+    
+    if (toMatch) {
+      const to = toMatch[1];
+      const subject = subjectMatch ? subjectMatch[1] : 'Message from JARVIS';
+      const body = bodyMatch ? bodyMatch[1] : 'This is an automated message from JARVIS.';
+      
+      const result = await emailService.sendEmail({ to, subject, body });
+      return { text: result.success ? result.message : `Failed to send email: ${result.error}` };
+    }
+    
+    // Template emails
+    if (lowerText.includes('meeting')) {
+      const toMatch = text.match(/(?:to|send)\s+([^\s]+@[^\s]+)/i);
+      if (toMatch) {
+        const result = await emailService.sendTemplateEmail('meeting', toMatch[1]);
+        return { text: result.success ? result.message : `Failed to send meeting email: ${result.error}` };
+      }
+    }
+    
+    if (lowerText.includes('report')) {
+      const toMatch = text.match(/(?:to|send)\s+([^\s]+@[^\s]+)/i);
+      if (toMatch) {
+        const result = await emailService.sendTemplateEmail('report', toMatch[1]);
+        return { text: result.success ? result.message : `Failed to send report email: ${result.error}` };
+      }
+    }
+    
+    return { text: 'Please specify recipient email address. Example: "Send email to user@example.com about meeting"' };
+  }
+  
+  return null;
+}
+
 // Socket connection
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -206,6 +249,28 @@ io.on('connection', (socket) => {
         voiceEngine.speakAsJarvis(professionalNewsResponse, { 
           confidence: 0.9, 
           category: 'news'
+        });
+        return;
+      }
+
+      // Handle email commands
+      const emailResponse = await handleEmailCommand(data.text);
+      if (emailResponse) {
+        const professionalEmailResponse = professionalSpeech.processForProfessionalSpeech(emailResponse.text, {
+          category: 'email',
+          data: { command: data.text }
+        });
+        
+        socket.emit('response', { 
+          text: professionalEmailResponse, 
+          source: 'email', 
+          confidence: 0.9,
+          voice_enabled: true
+        });
+        io.to('ai_services').emit('ai_response', { text: professionalEmailResponse });
+        voiceEngine.speakAsJarvis(professionalEmailResponse, { 
+          confidence: 0.9, 
+          category: 'email'
         });
         return;
       }
@@ -547,6 +612,56 @@ app.post('/api/news/clear-cache', async (req, res) => {
   }
 });
 
+// Email API endpoints
+app.post('/api/email/send', async (req, res) => {
+  try {
+    const { to, subject, body, cc, bcc } = req.body;
+    const result = await emailService.sendEmail({ to, subject, body, cc, bcc });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/email/draft', async (req, res) => {
+  try {
+    const { to, subject, body } = req.body;
+    const result = await emailService.createEmailDraft({ to, subject, body });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/email/template', async (req, res) => {
+  try {
+    const { template, to, customizations } = req.body;
+    const result = await emailService.sendTemplateEmail(template, to, customizations);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/email/templates', async (req, res) => {
+  try {
+    const templates = emailService.getEmailTemplates();
+    res.json(templates);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/computer/open-any', async (req, res) => {
+  try {
+    const { query } = req.body;
+    const result = await computerControl.openAnyApplication(query);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`JARVIS Enhanced Backend with Learning running on port ${PORT}`);
   console.log('🧠 AI Learning System: ENABLED');
@@ -559,4 +674,6 @@ server.listen(PORT, () => {
   console.log('📰 News Integration: ENABLED');
   console.log('🔧 System Monitoring: ACTIVE');
   console.log('🎤 Professional Speech: ACTIVE');
+  console.log('📧 Email Services: ENABLED');
+  console.log('🚀 Enhanced Application Control: ACTIVE');
 });

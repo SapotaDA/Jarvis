@@ -92,7 +92,98 @@ class ComputerControlService {
         });
     }
 
+    async openAnyApplication(query) {
+        const commonApps = {
+            'chrome': 'chrome.exe',
+            'firefox': 'firefox.exe',
+            'edge': 'msedge.exe',
+            'notepad': 'notepad.exe',
+            'word': 'winword.exe',
+            'excel': 'excel.exe',
+            'powerpoint': 'powerpnt.exe',
+            'outlook': 'outlook.exe',
+            'calculator': 'calc.exe',
+            'paint': 'mspaint.exe',
+            'cmd': 'cmd.exe',
+            'terminal': 'wt.exe', // Windows Terminal
+            'explorer': 'explorer.exe',
+            'control': 'control.exe',
+            'taskmgr': 'taskmgr.exe',
+            'devmgmt': 'devmgmt.msc',
+            'services': 'services.msc',
+            'regedit': 'regedit.exe',
+            'discord': 'discord.exe',
+            'slack': 'slack.exe',
+            'teams': 'ms-teams.exe',
+            'zoom': 'Zoom.exe',
+            'spotify': 'Spotify.exe',
+            'vlc': 'vlc.exe',
+            'photoshop': 'Photoshop.exe',
+            'illustrator': 'Illustrator.exe',
+            'premiere': 'Adobe Premiere Pro.exe',
+            'after effects': 'AfterFX.exe',
+            'visual studio': 'devenv.exe',
+            'vs code': 'code.exe',
+            'intellij': 'idea64.exe',
+            'eclipse': 'eclipse.exe',
+            'android studio': 'studio64.exe',
+            'unity': 'Unity.exe',
+            'blender': 'blender.exe',
+            'gimp': 'gimp-2.10.exe',
+            'inkscape': 'inkscape.exe',
+            'filezilla': 'filezilla.exe',
+            'putty': 'putty.exe',
+            'winscp': 'WinSCP.exe',
+            '7zip': '7zFM.exe',
+            'winrar': 'WinRAR.exe',
+            'vlc': 'vlc.exe',
+            'foobar': 'foobar2000.exe',
+            'itunes': 'iTunes.exe',
+            'steam': 'steam.exe',
+            'epic games': 'EpicGamesLauncher.exe',
+            'origin': 'Origin.exe',
+            'uplay': 'Uplay.exe',
+            'gog galaxy': 'GalaxyClient.exe',
+            'battle.net': 'Battle.net.exe',
+            'minecraft': 'MinecraftLauncher.exe',
+            'roblox': 'RobloxPlayerBeta.exe'
+        };
+
+        const queryLower = query.toLowerCase();
+        
+        // Direct match
+        if (commonApps[queryLower]) {
+            return await this.openApplication(commonApps[queryLower]);
+        }
+        
+        // Partial match
+        for (const [key, value] of Object.entries(commonApps)) {
+            if (key.includes(queryLower) || queryLower.includes(key)) {
+                return await this.openApplication(value);
+            }
+        }
+        
+        // Try to open as file or URL
+        if (query.startsWith('http://') || query.startsWith('https://') || query.startsWith('www.')) {
+            return await this.openURL(query);
+        }
+        
+        // Try to open as file path
+        try {
+            const fs = require('fs').promises;
+            await fs.access(query);
+            return await this.openApplication(query);
+        } catch (error) {
+            // File doesn't exist, try to search for it
+            return { success: false, error: `Application or file '${query}' not found` };
+        }
+    }
+
     async openURL(url) {
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            url = `https://${url}`;
+        }
+        
         return new Promise((resolve) => {
             let command;
             
