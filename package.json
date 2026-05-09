@@ -2,7 +2,7 @@
   "name": "jarvis-ai-assistant",
   "version": "2.0.0",
   "description": "Professional AI Assistant with Advanced Learning and Voice Capabilities",
-  "main": "src/backend/app.js",
+  "main": "server/index.js",
   "homepage": "https://github.com/SapotaDA/Jarvis",
   "repository": {
     "type": "git",
